@@ -1,0 +1,9 @@
+constexpr int WIDTH = 1200;
+constexpr int HEIGHT = 800;
+constexpr float BORDER_OFFSET = 50.0f;
+constexpr float PADDLE_OFFSET_FROM_BORDER = 15.0f;
+constexpr float PADDLE_WIDTH = 20.0f;
+constexpr float PADDLE_HEIGHT = 150.0f;
+constexpr float PADDLE_SPEED = 5.0f;  // 5 pixels per frame
+constexpr float BALL_RADIUS = 15.0f;
+constexpr float BALL_SPEED = 13.0f;
