@@ -1,9 +1,14 @@
-# Pong (C++)
+# Pong
 
 A modern implementation of the classic **Pong** game written in **C++**.
 
 This project focuses on clean architecture, correctness, and gameplay feel rather than raw feature count. It demonstrates structured game-state management, collision handling, and a smooth, human-like CPU opponent implemented using control-based logic.
 
+## Demo
+
+<p align="center">
+  <img src="assets/demo.gif" alt="Pong gameplay demo" width="640">
+</p>
 
 
 ## Overview
@@ -17,11 +22,6 @@ This Pong implementation was built as a learning and portfolio project with an e
 
 The codebase intentionally remains small and understandable while still addressing common pitfalls such as collision jitter, unstable AI movement, and unclear game flow.
 
-## Demo
-
-```text
-TODO: add GIF
-```
 
 ## Features
 
@@ -36,11 +36,6 @@ TODO: add GIF
 * Angle-based ball reflection depending on paddle hit position
 * Smooth, non-jittery CPU paddle movement
 * Minimal UI for menus and game states
-
-
-
-
-
 
 
 ## Controls
