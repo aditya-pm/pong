@@ -1,6 +1,6 @@
 #include <cmath>
 
-#include "config.h"
+#include "config.hpp"
 #include "raylib.h"
 
 #define RAYGUI_IMPLEMENTATION
@@ -23,6 +23,12 @@ struct Ball {
     Vector2 velocity;
     float radius;
 };
+
+float clamp(float value, float min, float max) {
+    if (value < min) return min;
+    if (value > max) return max;
+    return value;
+}
 
 void reset_game(Rectangle& paddle_left, Rectangle& paddle_right, Ball& ball) {
     paddle_left = {
@@ -123,7 +129,11 @@ void update_ball(Ball& ball, Rectangle& paddle_left, Rectangle& paddle_right,
     ball.position.x += ball.velocity.x;
     ball.position.y += ball.velocity.y;
 
+    // ball and left paddle collision
     if (CheckCollisionCircleRec(ball.position, ball.radius, paddle_left)) {
+        // prevent jitters, colliding twice, tunnelling
+        ball.position.x = paddle_left.x + PADDLE_WIDTH + ball.radius;
+
         float paddle_left_center_y = paddle_left.y + PADDLE_HEIGHT / 2;
         float hit_offset = ball.position.y - paddle_left_center_y;
         float normalized = hit_offset / (PADDLE_HEIGHT / 2.0f);
@@ -132,7 +142,11 @@ void update_ball(Ball& ball, Rectangle& paddle_left, Rectangle& paddle_right,
         ball.velocity.y = sin(angle) * BALL_SPEED;
     }
 
+    // ball and right paddle collision
     if (CheckCollisionCircleRec(ball.position, ball.radius, paddle_right)) {
+        // prevent jitters, colliding twice, tunnelling
+        ball.position.x = paddle_right.x - ball.radius;
+
         float paddle_right_center_y = paddle_right.y + PADDLE_HEIGHT / 2;
         float hit_offset = ball.position.y - paddle_right_center_y;
         float normalized = hit_offset / (PADDLE_HEIGHT / 2.0f);
@@ -202,13 +216,33 @@ void handle_paddle_input_singleplayer(Rectangle& paddle_left) {
     }
 }
 
-void cpu_move(Ball ball, Rectangle& paddle) {
-    if ((ball.position.y > paddle.y + PADDLE_HEIGHT / 2) &&
-        (paddle.y + PADDLE_HEIGHT < HEIGHT - BORDER_OFFSET - PADDLE_OFFSET_FROM_BORDER)) {
-        paddle.y += PADDLE_SPEED;
-    } else if ((ball.position.y < paddle.y + PADDLE_HEIGHT / 2) &&
-               (paddle.y > BORDER_OFFSET + PADDLE_OFFSET_FROM_BORDER)) {
-        paddle.y -= PADDLE_SPEED;
+void cpu_move(const Ball& ball, Rectangle& paddle) {
+    if (ball.velocity.x < 0) return;  // don't track ball if ball moving away
+
+    float paddle_center = paddle.y + PADDLE_HEIGHT / 2;
+
+    // must be static (preserve error across frames, until it is calculated again)
+    static float aim_error = 0.0f;
+    if (GetRandomValue(0, 100) < 3) {
+        aim_error = GetRandomValue(-25, 25);
+    }
+
+    float target_y = ball.position.y + aim_error;
+    float error = target_y - paddle_center;
+
+    // remove the jitter
+    if (fabs(error) < AI_DEAD_ZONE) return;
+
+    // actual paddle movement speed proportional to distance to ball
+    // 10% of remaining error corrected per frame, this reduces overshoots when ball is near
+    // and hence reduces jitter
+    float move = clamp(error * 0.1f, -PADDLE_SPEED, PADDLE_SPEED);
+
+    if ((move > 0 &&
+         paddle.y + PADDLE_HEIGHT < HEIGHT - BORDER_OFFSET - PADDLE_OFFSET_FROM_BORDER) ||
+        (move < 0 &&
+         paddle.y > BORDER_OFFSET + PADDLE_OFFSET_FROM_BORDER)) {
+        paddle.y += move;
     }
 }
 
@@ -220,7 +254,7 @@ int main() {
     GuiSetStyle(DEFAULT, TEXT_SIZE, MENU_BUTTON_FONT_SIZE);
 
     GameState state = GameState::MAIN_MENU;
-    GameMode mode;
+    GameMode mode = GameMode::SINGLE_PLAYER;
 
     int player_left_score = 0;
     int player_right_score = 0;
