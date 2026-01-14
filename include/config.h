@@ -9,3 +9,4 @@ constexpr float BALL_RADIUS = 15.0f;
 constexpr float BALL_SPEED = 12.0f;
 // constexpr float MAX_BOUNCE_ANGLE = 60.0f * (3.14159265358979323846f / 180.0f);
 constexpr float MAX_BOUNCE_ANGLE = 1.0472;
+constexpr int MENU_BUTTON_FONT_SIZE = 50;

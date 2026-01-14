@@ -3,10 +3,19 @@
 #include "config.h"
 #include "raylib.h"
 
+#define RAYGUI_IMPLEMENTATION
+#include "raygui.h"
+
 enum class GameState {
+    MAIN_MENU,
     ROUND_START,
     PAUSED,
     PLAYING
+};
+
+enum class GameMode {
+    SINGLE_PLAYER,
+    MULTI_PLAYER
 };
 
 struct Ball {
@@ -15,7 +24,7 @@ struct Ball {
     float radius;
 };
 
-void reset_game(Rectangle& paddle_left, Rectangle& paddle_right, Ball& ball, GameState& state) {
+void reset_game(Rectangle& paddle_left, Rectangle& paddle_right, Ball& ball) {
     paddle_left = {
         BORDER_OFFSET + PADDLE_OFFSET_FROM_BORDER,
         HEIGHT / 2.0 - PADDLE_HEIGHT / 2,
@@ -64,6 +73,37 @@ void draw_paddles(Rectangle paddle_left, Rectangle paddle_right) {
 
 void draw_ball(Ball ball) {
     DrawCircleV(ball.position, ball.radius, WHITE);
+}
+
+void main_menu(GameState& state, GameMode& mode) {
+    int pong_title_width = MeasureText("PONG!", 100);
+    DrawText("PONG!", WIDTH / 2.0f - (pong_title_width / 2.0f), 100, 100, WHITE);
+    DrawLineEx({WIDTH / 2.0f - (pong_title_width / 2.0f) - 50, 220},
+               {WIDTH / 2.0f + (pong_title_width / 2.0f) + 50, 220}, 2, WHITE);
+
+    // +20 is for padding
+    float button_width = MeasureText("SINGLE PLAYER", MENU_BUTTON_FONT_SIZE) + 20;
+    float button_height = MENU_BUTTON_FONT_SIZE + 20;
+
+    Rectangle singleplayer_button_bounds = {
+        WIDTH / 2 - button_width / 2,
+        (HEIGHT / 2) - (button_height / 2) - 50,
+        button_width, button_height};
+
+    Rectangle multiplayer_button_bounds = {
+        WIDTH / 2 - button_width / 2,
+        (HEIGHT / 2) - (button_height / 2) + 50,
+        button_width, button_height};
+
+    if (GuiButton(singleplayer_button_bounds, "SINGLE PLAYER")) {
+        mode = GameMode::SINGLE_PLAYER;
+        state = GameState::ROUND_START;
+    }
+
+    if (GuiButton(multiplayer_button_bounds, "MULTIPLAYER")) {
+        mode = GameMode::MULTI_PLAYER;
+        state = GameState::ROUND_START;
+    }
 }
 
 void draw_pause() {
@@ -122,7 +162,7 @@ void update_ball(Ball& ball, Rectangle& paddle_left, Rectangle& paddle_right,
     }
 }
 
-void handle_paddle_input(Rectangle& paddle_left, Rectangle& paddle_right) {
+void handle_paddle_input_multiplayer(Rectangle& paddle_left, Rectangle& paddle_right) {
     if (IsKeyDown(KEY_W)) {
         if (paddle_left.y > BORDER_OFFSET + PADDLE_OFFSET_FROM_BORDER) {
             paddle_left.y -= PADDLE_SPEED;
@@ -148,11 +188,39 @@ void handle_paddle_input(Rectangle& paddle_left, Rectangle& paddle_right) {
     }
 }
 
+void handle_paddle_input_singleplayer(Rectangle& paddle_left) {
+    if (IsKeyDown(KEY_W) || IsKeyDown(KEY_UP)) {
+        if (paddle_left.y > BORDER_OFFSET + PADDLE_OFFSET_FROM_BORDER) {
+            paddle_left.y -= PADDLE_SPEED;
+        }
+    }
+
+    if (IsKeyDown(KEY_S) || (IsKeyDown(KEY_DOWN))) {
+        if (paddle_left.y + PADDLE_HEIGHT < HEIGHT - BORDER_OFFSET - PADDLE_OFFSET_FROM_BORDER) {
+            paddle_left.y += PADDLE_SPEED;
+        }
+    }
+}
+
+void cpu_move(Ball ball, Rectangle& paddle) {
+    if ((ball.position.y > paddle.y + PADDLE_HEIGHT / 2) &&
+        (paddle.y + PADDLE_HEIGHT < HEIGHT - BORDER_OFFSET - PADDLE_OFFSET_FROM_BORDER)) {
+        paddle.y += PADDLE_SPEED;
+    } else if ((ball.position.y < paddle.y + PADDLE_HEIGHT / 2) &&
+               (paddle.y > BORDER_OFFSET + PADDLE_OFFSET_FROM_BORDER)) {
+        paddle.y -= PADDLE_SPEED;
+    }
+}
+
 int main() {
     InitWindow(WIDTH, HEIGHT, "Pong");
     SetTargetFPS(60);
 
-    GameState state = GameState::ROUND_START;
+    GuiLoadStyle("style/style_terminal.rgs");
+    GuiSetStyle(DEFAULT, TEXT_SIZE, MENU_BUTTON_FONT_SIZE);
+
+    GameState state = GameState::MAIN_MENU;
+    GameMode mode;
 
     int player_left_score = 0;
     int player_right_score = 0;
@@ -167,15 +235,21 @@ int main() {
         BeginDrawing();
         ClearBackground(BLACK);
 
-        draw_border();
-        draw_player_scores(player_left_score, player_right_score);
-        draw_paddles(paddle_left, paddle_right);
-        draw_ball(ball);
+        if (state != GameState::MAIN_MENU) {
+            draw_border();
+            draw_player_scores(player_left_score, player_right_score);
+            draw_paddles(paddle_left, paddle_right);
+            draw_ball(ball);
+        }
 
         switch (state) {
+            case GameState::MAIN_MENU:
+                main_menu(state, mode);
+                break;
+
             case GameState::ROUND_START:
                 if (!round_initialized) {
-                    reset_game(paddle_left, paddle_right, ball, state);
+                    reset_game(paddle_left, paddle_right, ball);
                     round_initialized = true;
                 }
 
@@ -187,8 +261,17 @@ int main() {
                 break;
 
             case GameState::PLAYING:
-                handle_paddle_input(paddle_left, paddle_right);
+                if (mode == GameMode::MULTI_PLAYER) {
+                    handle_paddle_input_multiplayer(paddle_left, paddle_right);
+                }
+
+                if (mode == GameMode::SINGLE_PLAYER) {
+                    handle_paddle_input_singleplayer(paddle_left);
+                    cpu_move(ball, paddle_right);
+                }
+
                 update_ball(ball, paddle_left, paddle_right, player_left_score, player_right_score, state);
+
                 if (IsKeyPressed(KEY_P)) state = GameState::PAUSED;
                 break;
 
