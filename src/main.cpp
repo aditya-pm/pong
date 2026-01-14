@@ -33,8 +33,6 @@ void reset_game(Rectangle& paddle_left, Rectangle& paddle_right, Ball& ball, Gam
     float initial_direction = GetRandomValue(0, 1) == 0 ? -1.0f : 1.0f;  // left or right
     ball.velocity.x = cosf(initial_angle) * initial_direction * BALL_SPEED;
     ball.velocity.y = sinf(initial_angle) * BALL_SPEED;
-
-    state = GameState::ROUND_START;
 }
 
 void draw_border() {
@@ -85,15 +83,29 @@ void update_ball(Ball& ball, Rectangle& paddle_left, Rectangle& paddle_right,
     ball.position.x += ball.velocity.x;
     ball.position.y += ball.velocity.y;
 
-    if (CheckCollisionCircleRec(ball.position, ball.radius, paddle_left) ||
-        CheckCollisionCircleRec(ball.position, ball.radius, paddle_right)) {
-        ball.velocity.x *= -1;
+    if (CheckCollisionCircleRec(ball.position, ball.radius, paddle_left)) {
+        float paddle_left_center_y = paddle_left.y + PADDLE_HEIGHT / 2;
+        float hit_offset = ball.position.y - paddle_left_center_y;
+        float normalized = hit_offset / (PADDLE_HEIGHT / 2.0f);
+        float angle = normalized * MAX_BOUNCE_ANGLE;
+        ball.velocity.x = cos(angle) * BALL_SPEED * 1;  // 1 = direction (left->right)
+        ball.velocity.y = sin(angle) * BALL_SPEED;
+    }
+
+    if (CheckCollisionCircleRec(ball.position, ball.radius, paddle_right)) {
+        float paddle_right_center_y = paddle_right.y + PADDLE_HEIGHT / 2;
+        float hit_offset = ball.position.y - paddle_right_center_y;
+        float normalized = hit_offset / (PADDLE_HEIGHT / 2.0f);
+        float angle = normalized * MAX_BOUNCE_ANGLE;
+        ball.velocity.x = cos(angle) * BALL_SPEED * -1;
+        ball.velocity.y = sin(angle) * BALL_SPEED;  // -1 = direction (right->left)
     }
 
     Vector2 top_left = {BORDER_OFFSET, BORDER_OFFSET};
     Vector2 top_right = {WIDTH - BORDER_OFFSET, BORDER_OFFSET};
     Vector2 bottom_left = {BORDER_OFFSET, HEIGHT - BORDER_OFFSET};
     Vector2 bottom_right = {WIDTH - BORDER_OFFSET, HEIGHT - BORDER_OFFSET};
+
     if (CheckCollisionCircleLine(ball.position, ball.radius, top_left, top_right) ||
         CheckCollisionCircleLine(ball.position, ball.radius, bottom_left, bottom_right)) {
         ball.velocity.y *= -1;
@@ -149,6 +161,8 @@ int main() {
     Rectangle paddle_right;
     Ball ball;
 
+    bool round_initialized = false;
+
     while (!WindowShouldClose()) {
         BeginDrawing();
         ClearBackground(BLACK);
@@ -160,9 +174,16 @@ int main() {
 
         switch (state) {
             case GameState::ROUND_START:
-                reset_game(paddle_left, paddle_right, ball, state);
+                if (!round_initialized) {
+                    reset_game(paddle_left, paddle_right, ball, state);
+                    round_initialized = true;
+                }
+
                 draw_round_start();
-                if (IsKeyPressed(KEY_ENTER)) state = GameState::PLAYING;
+                if (IsKeyPressed(KEY_ENTER)) {
+                    round_initialized = false;
+                    state = GameState::PLAYING;
+                }
                 break;
 
             case GameState::PLAYING:
